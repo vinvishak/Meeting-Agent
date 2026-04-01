@@ -1,50 +1,104 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+SYNC IMPACT REPORT
+==================
+Version change: [TEMPLATE] → 1.0.0 (initial ratification)
+Modified principles: N/A (first-time fill from template)
+Added sections:
+  - Core Principles (I–V)
+  - Quality Standards
+  - Development Workflow
+  - Governance
+Removed sections: None
+Templates requiring updates:
+  - ✅ .specify/templates/plan-template.md — Constitution Check gates align with principles below
+  - ✅ .specify/templates/spec-template.md — no changes required; structure already compatible
+  - ✅ .specify/templates/tasks-template.md — task phases align with modular, test-first approach
+Deferred TODOs: None
+-->
+
+# Meeting Agent Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Modular & Clean Code (NON-NEGOTIABLE)
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+Every unit of code MUST have a single, clearly stated purpose.
+Modules, classes, and functions MUST be self-contained, independently testable, and free of
+hidden side-effects. God classes, deeply nested logic, and tangled cross-module dependencies
+are prohibited. Each new component MUST clearly justify its existence and boundary.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+**Rationale**: The meeting agent domain involves multiple concerns (transcription, summarization,
+scheduling, action-item extraction). Keeping each concern in its own clean module prevents
+accretion of complexity and makes the system safe to extend.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### II. Single Responsibility
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+Every module, service, and agent tool MUST own exactly one concern.
+If a description requires the word "and" to cover what a component does, it MUST be split.
+Shared utilities are permitted only when the abstraction is used in three or more distinct
+places and is genuinely general-purpose.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+**Rationale**: Supports Principle I — modularity is unenforceable without strict responsibility
+boundaries.
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+### III. Test-First
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+Tests MUST be written before implementation begins. Each test MUST fail before the code that
+makes it pass is written. The Red-Green-Refactor cycle is strictly enforced.
+Integration tests are required for all agent-to-agent communication and external API calls.
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+**Rationale**: Meeting agent workflows span LLM calls, audio/text pipelines, and external
+calendars/APIs. Untested integration paths are the primary source of production failures in
+this domain.
+
+### IV. Agent Composability
+
+Every agent tool and pipeline stage MUST be independently invocable, accept well-defined
+inputs, and produce well-defined outputs. No tool may depend on implicit shared global state.
+Text-based I/O (structured JSON + human-readable) is the standard protocol between components.
+
+**Rationale**: Composable tools can be tested, replaced, and reused individually — a
+prerequisite for maintaining a clean modular architecture as the agent grows.
+
+### V. Simplicity First (YAGNI)
+
+The simplest solution that satisfies the current requirement MUST be implemented first.
+Abstractions, generalization, and architectural patterns MUST NOT be added speculatively.
+Every deviation from the simplest path MUST be documented in the plan's Complexity Tracking
+table with a concrete justification.
+
+**Rationale**: Premature complexity is the leading cause of code that violates Principle I.
+Simplicity is the precondition for modularity.
+
+## Quality Standards
+
+All code MUST pass linting and formatting checks before merge (no exceptions).
+Type annotations are REQUIRED for all public interfaces.
+Code review MUST verify compliance with Principles I–V before approval.
+Performance-sensitive paths MUST include a benchmark or latency target in the task definition.
+Security-sensitive paths (API keys, user data, audio/transcript storage) MUST undergo a
+targeted security review — no broad "security hardening" tasks without a specific threat
+identified.
+
+## Development Workflow
+
+Feature branches MUST be created from `main` and merged via pull request.
+Each PR MUST reference the spec and plan documents for the feature.
+Commits SHOULD be atomic — one logical change per commit.
+The Complexity Tracking table in the plan MUST be filled in whenever a Constitution Check
+gate is violated; the PR cannot be merged without it.
+Tasks MUST be organized by user story (per `.specify/templates/tasks-template.md`) to enable
+independent delivery of each story.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all informal practices and prior verbal agreements.
+Amendments require: (1) a written proposal describing the change and rationale, (2) a version
+bump following semantic versioning (MAJOR for principle removal/redefinition, MINOR for
+additions, PATCH for clarifications), and (3) an updated Sync Impact Report in this file.
+All PRs and code reviews MUST verify compliance with the principles above.
+Complexity MUST be justified in writing — "it felt cleaner" is not a justification.
+Use `.specify/memory/constitution.md` (this file) as the authoritative runtime governance
+reference.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-03-30 | **Last Amended**: 2026-03-30
