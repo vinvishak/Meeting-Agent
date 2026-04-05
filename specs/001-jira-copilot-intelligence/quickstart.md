@@ -21,7 +21,22 @@ Core dependencies: `anthropic`, `mcp`, `fastapi`, `uvicorn`, `sqlalchemy`, `alem
 
 ## 2. Configure Environment
 
-Copy the example config and fill in your MCP server details:
+**Recommended** — use the interactive quickstart wizard (prompts for each credential, validates connectivity, and initialises the database in one step):
+
+```bash
+python -m src.quickstart
+```
+
+Or for scripted/CI environments:
+
+```bash
+python -m src.quickstart --non-interactive \
+  --jira-mcp-url <URL> --jira-mcp-token <TOKEN> \
+  --copilot-mcp-url <URL> --copilot-mcp-token <TOKEN> \
+  --anthropic-api-key <KEY>
+```
+
+If you prefer to configure manually, copy the example config and fill in your details:
 
 ```bash
 cp .env.example .env
