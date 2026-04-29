@@ -7,7 +7,7 @@ classes are defined here and used throughout the application for type safety.
 
 import uuid
 from datetime import UTC, date, datetime
-from enum import Enum as PyEnum
+from enum import StrEnum
 from typing import Optional
 
 import sqlalchemy as sa
@@ -36,7 +36,7 @@ class Base(DeclarativeBase):
 # ---------------------------------------------------------------------------
 
 
-class NormalizedStatus(str, PyEnum):
+class NormalizedStatus(StrEnum):
     open = "open"
     in_progress = "in_progress"
     review = "review"
@@ -44,7 +44,7 @@ class NormalizedStatus(str, PyEnum):
     blocked = "blocked"
 
 
-class InferredStatus(str, PyEnum):
+class InferredStatus(StrEnum):
     officially_in_progress = "officially_in_progress"
     likely_in_progress = "likely_in_progress"
     blocked = "blocked"
@@ -52,19 +52,19 @@ class InferredStatus(str, PyEnum):
     completed_not_updated = "completed_not_updated"
 
 
-class SprintState(str, PyEnum):
+class SprintState(StrEnum):
     future = "future"
     active = "active"
     closed = "closed"
 
 
-class MatchType(str, PyEnum):
+class MatchType(StrEnum):
     exact_id = "exact_id"
     semantic = "semantic"
     unresolved = "unresolved"
 
 
-class MentionIntent(str, PyEnum):
+class MentionIntent(StrEnum):
     progress_update = "progress_update"
     blocker = "blocker"
     completion = "completion"
@@ -75,7 +75,7 @@ class MentionIntent(str, PyEnum):
     ambiguous = "ambiguous"
 
 
-class UpdateType(str, PyEnum):
+class UpdateType(StrEnum):
     status_transition = "status_transition"
     add_comment = "add_comment"
     update_assignee = "update_assignee"
@@ -83,20 +83,20 @@ class UpdateType(str, PyEnum):
     update_due_date = "update_due_date"
 
 
-class ConfidenceTier(str, PyEnum):
+class ConfidenceTier(StrEnum):
     high = "high"
     medium = "medium"
     low = "low"
 
 
-class ApprovalState(str, PyEnum):
+class ApprovalState(StrEnum):
     pending = "pending"
     approved = "approved"
     rejected = "rejected"
     auto_applied = "auto_applied"
 
 
-class AuditEventType(str, PyEnum):
+class AuditEventType(StrEnum):
     status_inferred = "status_inferred"
     suggestion_created = "suggestion_created"
     suggestion_approved = "suggestion_approved"
