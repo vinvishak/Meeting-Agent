@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from src.api.middleware.auth import AuthMiddleware
 from src.config import get_settings
@@ -95,6 +96,14 @@ def create_app() -> FastAPI:
     # Each route module is implemented in its own Phase task.
 
     _register_routes(app)
+
+    # ---------------------------------------------------------------------------
+    # Static frontend — served at /app
+    # ---------------------------------------------------------------------------
+    import os
+    frontend_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "frontend")
+    if os.path.isdir(frontend_dir):
+        app.mount("/app", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 
     return app
 

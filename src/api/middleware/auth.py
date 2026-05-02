@@ -19,13 +19,14 @@ from src.logging_config import get_logger
 
 logger = get_logger(__name__)
 
-# Paths that bypass auth (health probes, etc.)
+# Paths that bypass auth (health probes, static frontend, etc.)
 _PUBLIC_PATHS: frozenset[str] = frozenset({"/", "/health", "/docs", "/openapi.json", "/redoc"})
+_PUBLIC_PREFIXES: tuple[str, ...] = ("/app",)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next) -> Response:
-        if request.url.path in _PUBLIC_PATHS:
+        if request.url.path in _PUBLIC_PATHS or request.url.path.startswith(_PUBLIC_PREFIXES):
             request.state.user_id = "anonymous"
             request.state.authorized_project_keys = []
             request.state.project_keys = []

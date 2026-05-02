@@ -6,9 +6,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # Jira MCP Server
-    jira_mcp_url: str = "http://localhost:3000"
-    jira_mcp_token: str = ""
+    # Jira Cloud REST API
+    jira_base_url: str = "https://yourcompany.atlassian.net"
+    jira_email: str = ""
+    jira_api_token: str = ""
 
     # Copilot MCP Server
     copilot_mcp_url: str = "http://localhost:3001"
