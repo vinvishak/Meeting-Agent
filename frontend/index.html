@@ -1,0 +1,580 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <title>Meeting Agent</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --blue:    #2563eb;
+      --orange:  #ea580c;
+      --red:     #dc2626;
+      --green:   #16a34a;
+      --grey:    #6b7280;
+      --bg:      #f3f4f6;
+      --surface: #ffffff;
+      --text:    #111827;
+      --border:  #e5e7eb;
+      --radius:  8px;
+    }
+
+    /* ── Reset ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      height: 56px;
+    }
+    header h1 { font-size: 18px; font-weight: 700; color: var(--text); }
+
+    /* ── Nav tabs ── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+      display: flex;
+      gap: 4px;
+    }
+    nav button {
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      padding: 12px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--grey);
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    nav button:hover { color: var(--text); }
+    nav button.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+    /* ── Main content ── */
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    section { display: none; }
+    section.active { display: block; }
+
+    /* ── Status badges ── */
+    .badge {
+      display: inline-block;
+      padding: 2px 10px;
+      border-radius: 9999px;
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-likely_in_progress { background: #dbeafe; color: var(--blue); }
+    .badge-stale              { background: #ffedd5; color: var(--orange); }
+    .badge-blocked            { background: #fee2e2; color: var(--red); }
+    .badge-done               { background: #dcfce7; color: var(--green); }
+    .badge-open               { background: #f3f4f6; color: var(--grey); }
+
+    /* ── Metric cards ── */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      text-align: center;
+    }
+    .metric-card .metric-value {
+      font-size: 36px;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .metric-card .metric-label { font-size: 13px; color: var(--grey); }
+    .metric-card.blue  .metric-value { color: var(--blue); }
+    .metric-card.orange .metric-value { color: var(--orange); }
+    .metric-card.red   .metric-value { color: var(--red); }
+    .metric-card.green .metric-value { color: var(--green); }
+    .metric-card.grey  .metric-value { color: var(--grey); }
+
+    /* ── Progress bar ── */
+    .progress-wrap { margin-top: 8px; }
+    .progress-wrap .progress-label { font-size: 13px; color: var(--grey); margin-bottom: 6px; }
+    .progress-bar { background: var(--border); border-radius: 9999px; height: 10px; overflow: hidden; }
+    .progress-fill { height: 100%; background: var(--green); border-radius: 9999px; transition: width 0.4s; }
+
+    /* ── Tables ── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: var(--radius); overflow: hidden; border: 1px solid var(--border); }
+    thead { background: var(--bg); }
+    th { padding: 10px 14px; text-align: left; font-size: 12px; font-weight: 600; color: var(--grey); text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid var(--border); }
+    td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover { background: #f9fafb; }
+
+    /* ── Toolbar ── */
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .toolbar label { font-size: 13px; color: var(--grey); }
+    .toolbar select {
+      padding: 6px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+    }
+
+    /* ── Buttons ── */
+    .btn { padding: 6px 14px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: opacity 0.15s; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: var(--blue); color: #fff; }
+    .btn-primary:hover:not(:disabled) { opacity: 0.9; }
+    .btn-approve { background: var(--green); color: #fff; border-color: var(--green); padding: 5px 12px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; }
+    .btn-approve:hover:not(:disabled) { opacity: 0.85; }
+    .btn-approve:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-reject  { background: var(--surface); color: var(--red); border: 1px solid var(--red); padding: 5px 12px; border-radius: var(--radius); font-size: 13px; font-weight: 500; cursor: pointer; }
+    .btn-reject:hover:not(:disabled) { background: #fee2e2; }
+    .btn-reject:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* ── States ── */
+    .loading { color: var(--grey); font-style: italic; padding: 20px 0; }
+    .error   { color: var(--red); padding: 8px 0; }
+    .empty   { color: var(--grey); padding: 20px 0; }
+
+    /* ── Suggestion cards ── */
+    #suggestions-list { display: flex; flex-direction: column; gap: 16px; }
+    .suggestion-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+    }
+    .suggestion-card .s-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+    .suggestion-card .s-body { margin-bottom: 14px; }
+    .suggestion-card .s-body p { margin-bottom: 4px; }
+    .suggestion-card .s-actions { display: flex; align-items: center; gap: 10px; }
+    .s-tag { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; font-size: 12px; color: var(--grey); }
+    .s-confidence { font-size: 13px; color: var(--grey); margin-left: auto; }
+
+    /* ── Query section ── */
+    .query-container { max-width: 680px; }
+    .query-container textarea {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-family: inherit;
+      resize: vertical;
+      background: var(--surface);
+      color: var(--text);
+    }
+    .query-container textarea:focus { outline: none; border-color: var(--blue); box-shadow: 0 0 0 3px #dbeafe; }
+    .query-container .query-actions { margin-top: 10px; }
+    #query-response { margin-top: 16px; }
+    .response-text {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+
+    /* ── Section heading ── */
+    .section-heading { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+
+    /* ── Velocity ── */
+    .velocity {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+    }
+    .velocity .trend-arrow { font-size: 24px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Meeting Agent</h1>
+</header>
+
+<nav id="nav">
+  <button class="active" data-section="section-tickets">Tickets</button>
+  <button data-section="section-sprint">Sprint Health</button>
+  <button data-section="section-org">Org Metrics</button>
+  <button data-section="section-suggestions">Suggestions</button>
+  <button data-section="section-query">Query</button>
+</nav>
+
+<main>
+  <section id="section-tickets" class="active">
+    <h2 class="section-heading">Tickets</h2>
+    <div id="tickets-content"><p class="loading">Loading tickets...</p></div>
+  </section>
+
+  <section id="section-sprint">
+    <h2 class="section-heading">Sprint Health</h2>
+    <div id="sprint-content"><p class="loading">Loading sprint health...</p></div>
+  </section>
+
+  <section id="section-org">
+    <h2 class="section-heading">Org Metrics</h2>
+    <div id="org-content"><p class="loading">Loading org metrics...</p></div>
+  </section>
+
+  <section id="section-suggestions">
+    <h2 class="section-heading">AI Suggestions</h2>
+    <div id="suggestions-content"><p class="loading">Loading suggestions...</p></div>
+  </section>
+
+  <section id="section-query">
+    <h2 class="section-heading">Ask a Question</h2>
+    <div class="query-container">
+      <textarea id="query-input" placeholder="Ask a question about your tickets..." rows="3"></textarea>
+      <div class="query-actions">
+        <button id="query-btn" class="btn btn-primary" onclick="submitQuery()">Ask</button>
+      </div>
+      <div id="query-response"></div>
+    </div>
+  </section>
+</main>
+
+<script>
+  /* ── Config ── */
+  const API_BASE = 'http://localhost:8000';
+  const TOKEN    = 'dev';
+
+  /* ── Core API helper ── */
+  async function api(path, options = {}) {
+    const res = await fetch(API_BASE + path, {
+      headers: {
+        'Authorization': 'Bearer ' + TOKEN,
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+      ...options,
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`HTTP ${res.status}: ${text}`);
+    }
+    return res.json();
+  }
+
+  /* ── Badge helper ── */
+  const STATUS_LABELS = {
+    likely_in_progress: 'In Progress',
+    stale:              'Stale',
+    blocked:            'Blocked',
+    done:               'Done',
+    open:               'Open',
+  };
+  function badge(status) {
+    const label = STATUS_LABELS[status] || status;
+    return `<span class="badge badge-${status}">${label}</span>`;
+  }
+
+  /* ── Relative time helper ── */
+  function relativeTime(isoString) {
+    if (!isoString) return '—';
+    const diff = Date.now() - new Date(isoString).getTime();
+    const minutes = Math.floor(diff / 60000);
+    if (minutes < 1)   return 'just now';
+    if (minutes < 60)  return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24)    return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 30)     return `${days} day${days !== 1 ? 's' : ''} ago`;
+    const months = Math.floor(days / 30);
+    if (months < 12)   return `${months} month${months !== 1 ? 's' : ''} ago`;
+    return `${Math.floor(months / 12)}y ago`;
+  }
+
+  /* ──────────────────────────────────────────
+     Tab navigation
+  ────────────────────────────────────────── */
+  document.querySelectorAll('#nav button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.section).classList.add('active');
+    });
+  });
+
+  /* ──────────────────────────────────────────
+     US1 — Tickets
+  ────────────────────────────────────────── */
+  let cachedTickets = [];
+
+  async function loadTickets() {
+    const el = document.getElementById('tickets-content');
+    el.innerHTML = '<p class="loading">Loading tickets...</p>';
+    try {
+      const data = await api('/api/v1/tickets');
+      cachedTickets = data.tickets || [];
+      el.innerHTML = `
+        <div class="toolbar">
+          <label for="status-filter">Filter by status:</label>
+          <select id="status-filter" onchange="renderTickets(cachedTickets, this.value)">
+            <option value="all">All</option>
+            <option value="likely_in_progress">In Progress</option>
+            <option value="stale">Stale</option>
+            <option value="blocked">Blocked</option>
+            <option value="done">Done</option>
+            <option value="open">Open</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Title</th>
+                <th>Status</th>
+                <th>Priority</th>
+                <th>Assignee</th>
+                <th>Last Updated</th>
+              </tr>
+            </thead>
+            <tbody id="tickets-body"></tbody>
+          </table>
+        </div>`;
+      renderTickets(cachedTickets, 'all');
+    } catch (err) {
+      el.innerHTML = `<p class="error">Could not load tickets. <button class="btn btn-primary" onclick="loadTickets()">Retry</button></p>`;
+    }
+  }
+
+  function renderTickets(tickets, filter) {
+    const filtered = filter === 'all' ? tickets : tickets.filter(t => t.inferred_status === filter);
+    const tbody = document.getElementById('tickets-body');
+    if (!tbody) return;
+    if (filtered.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--grey)">No tickets found.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = filtered.map(t => `
+      <tr>
+        <td><a href="https://vinv8290.atlassian.net/browse/${t.jira_id}" target="_blank">${t.jira_id}</a></td>
+        <td>${escHtml(t.title)}</td>
+        <td>${badge(t.inferred_status)}</td>
+        <td>${escHtml(t.priority || '—')}</td>
+        <td>${escHtml(t.assignee || 'Unassigned')}</td>
+        <td>${relativeTime(t.updated_at)}</td>
+      </tr>`).join('');
+  }
+
+  /* ──────────────────────────────────────────
+     US2 — Sprint Health
+  ────────────────────────────────────────── */
+  async function loadSprintHealth() {
+    const el = document.getElementById('sprint-content');
+    el.innerHTML = '<p class="loading">Loading sprint health...</p>';
+    try {
+      const d = await api('/api/v1/reports/sprint-health');
+      const pct = Math.round((d.completion_rate || 0) * 100);
+      el.innerHTML = `
+        <h3 style="margin-bottom:16px;font-size:16px;color:var(--grey)">${escHtml(d.sprint_name || 'Current Sprint')}</h3>
+        <div class="metrics-grid">
+          <div class="metric-card green">
+            <div class="metric-value">${d.by_status?.done ?? 0}</div>
+            <div class="metric-label">Done</div>
+          </div>
+          <div class="metric-card blue">
+            <div class="metric-value">${d.by_status?.in_progress ?? 0}</div>
+            <div class="metric-label">In Progress</div>
+          </div>
+          <div class="metric-card orange">
+            <div class="metric-value">${d.by_status?.stale ?? 0}</div>
+            <div class="metric-label">Stale</div>
+          </div>
+          <div class="metric-card red">
+            <div class="metric-value">${d.by_status?.blocked ?? 0}</div>
+            <div class="metric-label">Blocked</div>
+          </div>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-label">${pct}% complete</div>
+          <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+        </div>`;
+    } catch (err) {
+      el.innerHTML = '<p class="error">Could not load sprint health.</p>';
+    }
+  }
+
+  /* ──────────────────────────────────────────
+     US3 — Org Metrics
+  ────────────────────────────────────────── */
+  async function loadOrgMetrics() {
+    const el = document.getElementById('org-content');
+    el.innerHTML = '<p class="loading">Loading org metrics...</p>';
+    try {
+      const d = await api('/api/v1/reports/executive-summary');
+      const trend = d.velocity?.trend;
+      const arrow = trend === 'improving' ? '↑' : trend === 'declining' ? '↓' : trend === 'stable' ? '→' : null;
+      const velocityHtml = arrow
+        ? `<div class="velocity"><span class="trend-arrow">${arrow}</span><span>${trend.charAt(0).toUpperCase() + trend.slice(1)}</span></div>`
+        : `<div class="velocity"><span style="color:var(--grey)">Not enough data yet</span></div>`;
+      el.innerHTML = `
+        <div class="metrics-grid">
+          <div class="metric-card grey">
+            <div class="metric-value">${d.total_tickets ?? 0}</div>
+            <div class="metric-label">Total Tickets</div>
+          </div>
+          <div class="metric-card orange">
+            <div class="metric-value">${d.stale_count ?? 0}</div>
+            <div class="metric-label">Stale</div>
+          </div>
+          <div class="metric-card red">
+            <div class="metric-value">${d.blocked_count ?? 0}</div>
+            <div class="metric-label">Blocked</div>
+          </div>
+        </div>
+        <h3 style="font-size:14px;font-weight:600;margin-bottom:10px;color:var(--grey);text-transform:uppercase;letter-spacing:.05em">Velocity</h3>
+        ${velocityHtml}`;
+    } catch (err) {
+      el.innerHTML = '<p class="error">Could not load org metrics.</p>';
+    }
+  }
+
+  /* ──────────────────────────────────────────
+     US4 — Suggestions
+  ────────────────────────────────────────── */
+  async function loadSuggestions() {
+    const el = document.getElementById('suggestions-content');
+    el.innerHTML = '<p class="loading">Loading suggestions...</p>';
+    try {
+      const data = await api('/api/v1/suggestions');
+      const pending = (data.suggestions || []).filter(s => s.approval_state === 'pending');
+      if (pending.length === 0) {
+        el.innerHTML = '<p class="empty">No pending suggestions.</p>';
+        return;
+      }
+      el.innerHTML = '<div id="suggestions-list"></div>';
+      const list = document.getElementById('suggestions-list');
+      pending.forEach(s => {
+        const card = document.createElement('div');
+        card.className = 'suggestion-card';
+        card.dataset.id = s.id;
+        card.innerHTML = `
+          <div class="s-header">
+            <a href="https://vinv8290.atlassian.net/browse/${s.ticket_jira_id}" target="_blank"><strong>${s.ticket_jira_id}</strong></a>
+            <span class="s-tag">${escHtml(s.update_type.replace(/_/g, ' '))}</span>
+            <span class="s-tag" style="background:#eff6ff;border-color:#bfdbfe;color:var(--blue)">${escHtml(s.proposed_value)}</span>
+            <span class="s-confidence">${Math.round((s.confidence_score || 0) * 100)}% confidence</span>
+          </div>
+          <div class="s-body">
+            <p style="color:var(--grey);font-size:13px">${escHtml(s.reasoning)}</p>
+          </div>
+          <div class="s-actions">
+            <button class="btn-approve" onclick="approveSuggestion('${s.id}')">Approve</button>
+            <button class="btn-reject"  onclick="rejectSuggestion('${s.id}')">Reject</button>
+          </div>`;
+        list.appendChild(card);
+      });
+    } catch (err) {
+      el.innerHTML = '<p class="error">Could not load suggestions.</p>';
+    }
+  }
+
+  async function approveSuggestion(id) { await _actOnSuggestion(id, 'approve'); }
+  async function rejectSuggestion(id)  { await _actOnSuggestion(id, 'reject');  }
+
+  async function _actOnSuggestion(id, action) {
+    const card = document.querySelector(`.suggestion-card[data-id="${id}"]`);
+    if (!card) return;
+    const btns = card.querySelectorAll('button');
+    btns.forEach(b => { b.disabled = true; });
+    const errSpan = card.querySelector('.inline-error');
+    if (errSpan) errSpan.remove();
+    try {
+      await api(`/api/v1/suggestions/${id}/${action}`, { method: 'POST' });
+      card.remove();
+      const list = document.getElementById('suggestions-list');
+      if (list && list.children.length === 0) {
+        document.getElementById('suggestions-content').innerHTML = '<p class="empty">No pending suggestions.</p>';
+      }
+    } catch (err) {
+      btns.forEach(b => { b.disabled = false; });
+      const span = document.createElement('span');
+      span.className = 'error inline-error';
+      span.style.fontSize = '12px';
+      span.textContent = 'Failed. Try again.';
+      card.querySelector('.s-actions').appendChild(span);
+    }
+  }
+
+  /* ──────────────────────────────────────────
+     US5 — Natural Language Query
+  ────────────────────────────────────────── */
+  document.getElementById('query-input').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitQuery(); }
+  });
+
+  async function submitQuery() {
+    const input  = document.getElementById('query-input');
+    const btn    = document.getElementById('query-btn');
+    const output = document.getElementById('query-response');
+    const text   = input.value.trim();
+
+    if (!text) {
+      output.innerHTML = '<p class="error">Please enter a question.</p>';
+      return;
+    }
+
+    btn.disabled  = true;
+    btn.textContent = 'Thinking...';
+    output.innerHTML = '<p class="loading">Thinking...</p>';
+
+    try {
+      const data = await api('/api/v1/query', { method: 'POST', body: JSON.stringify({ query: text }) });
+      output.innerHTML = `<div class="response-text">${escHtml(data.response)}</div>`;
+    } catch (err) {
+      output.innerHTML = '<p class="error">Could not get a response. Please try again.</p>';
+    } finally {
+      btn.disabled    = false;
+      btn.textContent = 'Ask';
+    }
+  }
+
+  /* ──────────────────────────────────────────
+     Utilities
+  ────────────────────────────────────────── */
+  function escHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ──────────────────────────────────────────
+     Bootstrap
+  ────────────────────────────────────────── */
+  function loadAll() {
+    loadTickets();
+    loadSprintHealth();
+    loadOrgMetrics();
+    loadSuggestions();
+  }
+
+  document.addEventListener('DOMContentLoaded', loadAll);
+</script>
+
+</body>
+</html>

@@ -2,7 +2,7 @@
 Core sync worker.
 
 Orchestrates one full sync cycle:
-  1. Fetch Jira sprints + tickets via JiraMCPClient
+  1. Fetch Jira sprints + tickets via JiraClient
   2. Normalise engineer identities
   3. Resolve StatusMapping for each ticket's raw Jira status
   4. Extract classification signals and run the classifier
@@ -22,7 +22,7 @@ from datetime import UTC, datetime, timedelta
 from src.classification.classifier import classify
 from src.classification.signals import extract_signals
 from src.config import get_settings
-from src.ingestion.jira_client import JiraMCPClient
+from src.ingestion.jira_client import JiraClient
 from src.ingestion.normalizer import JiraIdentity, normalize_engineers
 from src.logging_config import configure_logging, get_logger
 from src.storage.database import AsyncSessionLocal
@@ -69,7 +69,7 @@ async def run_sync_cycle() -> None:
     error: Exception | None = None
 
     try:
-        async with JiraMCPClient() as jira:
+        async with JiraClient() as jira:
             for project_key in project_keys:
                 await _sync_project(jira, project_key, settings)
 
@@ -105,14 +105,15 @@ async def run_sync_cycle() -> None:
         raise error
 
 
-async def _sync_project(jira: JiraMCPClient, project_key: str, settings: object) -> None:
+async def _sync_project(jira: JiraClient, project_key: str, settings: object) -> None:
     """Sync all sprints and tickets for one Jira project key."""
     stale_days: int = getattr(settings, "stale_threshold_days", 10)
 
     # ------------------------------------------------------------------
     # 1. Fetch sprints
     # ------------------------------------------------------------------
-    sprints = await jira.list_sprints(project_key)
+    board_id = await jira.get_board_id(project_key)
+    sprints = await jira.list_sprints(board_id) if board_id else []
     sprint_id_map: dict[str, str] = {}  # jira_sprint_id → internal DB id
 
     async with AsyncSessionLocal() as session:
