@@ -82,6 +82,12 @@ async def run_sync_cycle() -> None:
         error = exc
         logger.error("Sync cycle failed: %s", exc, exc_info=True)
 
+    # GitHub sync runs independently — failure must not abort Jira sync results
+    try:
+        await _sync_github()
+    except Exception as exc:
+        logger.warning("GitHub sync failed (non-fatal): %s", exc, exc_info=True)
+
     elapsed = (_utcnow() - started_at).total_seconds()
     async with AsyncSessionLocal() as session:
         if error is None:
@@ -415,6 +421,145 @@ async def _recalculate_velocity(project_keys: list[str]) -> None:
             logger.debug("Velocity recalculated for board %s", board_id)
         except Exception as exc:
             logger.warning("Velocity recalculation failed for board %s: %s", board_id, exc)
+
+
+# ---------------------------------------------------------------------------
+# GitHub sync
+# ---------------------------------------------------------------------------
+
+
+async def _sync_github() -> None:
+    """
+    Fetch commits and PRs from GitHub for all configured repos.
+
+    Silently skips if GITHUB_PAT or GITHUB_ORG is not configured.
+    Extracts Jira ticket keys from commit messages and PR text, stores links.
+    """
+    from src.ingestion.github_client import GitHubClient, extract_jira_keys
+    from src.storage.repository import GitHubRepository
+
+    settings = get_settings()
+    if not settings.github_pat or not settings.github_org:
+        logger.debug("GitHub PAT or org not configured — skipping GitHub sync")
+        return
+
+    logger.info("GitHub sync started for org: %s", settings.github_org)
+    total_commits = 0
+    total_prs = 0
+    total_links = 0
+
+    async with GitHubClient() as gh:
+        # Determine which repos to sync
+        if settings.github_repos.strip():
+            repo_names = [r.strip() for r in settings.github_repos.split(",") if r.strip()]
+            from src.ingestion.github_client import GitHubRepoInfo
+            repos = [
+                GitHubRepoInfo(
+                    full_name=f"{settings.github_org}/{name}",
+                    org=settings.github_org,
+                    name=name,
+                    default_branch="main",
+                )
+                for name in repo_names
+            ]
+        else:
+            repos = await gh.list_repos()
+
+        for repo_info in repos:
+            try:
+                async with AsyncSessionLocal() as session:
+                    db_repo = await GitHubRepository.upsert_repo(
+                        session,
+                        org=repo_info.org,
+                        name=repo_info.name,
+                        full_name=repo_info.full_name,
+                        default_branch=repo_info.default_branch,
+                    )
+                    await session.commit()
+                    since = _aware(db_repo.last_synced_at) if db_repo.last_synced_at else None
+                    repo_id = db_repo.id
+
+                # Fetch and store commits
+                commits = await gh.list_commits(repo_info.full_name, since=since)
+                async with AsyncSessionLocal() as session:
+                    for c in commits:
+                        commit = await GitHubRepository.upsert_commit(
+                            session,
+                            repo_id=repo_id,
+                            sha=c.sha,
+                            message=c.message,
+                            author_login=c.author_login,
+                            author_name=c.author_name,
+                            author_email=c.author_email,
+                            committed_at=_aware(c.committed_at),
+                            branch=c.branch,
+                            url=c.url,
+                        )
+                        for key in extract_jira_keys(c.message):
+                            await GitHubRepository.upsert_jira_link(
+                                session,
+                                source_type="commit",
+                                jira_key=key,
+                                commit_sha=commit.sha,
+                            )
+                            total_links += 1
+                    await session.commit()
+                total_commits += len(commits)
+
+                # Fetch and store PRs
+                prs = await gh.list_prs(repo_info.full_name, since=since)
+                async with AsyncSessionLocal() as session:
+                    for p in prs:
+                        pr = await GitHubRepository.upsert_pr(
+                            session,
+                            repo_id=repo_id,
+                            pr_number=p.pr_number,
+                            title=p.title,
+                            body=p.body,
+                            state=p.state,
+                            author_login=p.author_login,
+                            head_branch=p.head_branch,
+                            base_branch=p.base_branch,
+                            opened_at=_aware(p.opened_at),
+                            closed_at=_aware(p.closed_at) if p.closed_at else None,
+                            merged_at=_aware(p.merged_at) if p.merged_at else None,
+                            url=p.url,
+                        )
+                        pr_text = f"{p.title} {p.body[:2000] if p.body else ''}"
+                        for key in extract_jira_keys(pr_text):
+                            await GitHubRepository.upsert_jira_link(
+                                session,
+                                source_type="pr",
+                                jira_key=key,
+                                pr_id=pr.id,
+                            )
+                            total_links += 1
+                    await session.commit()
+                total_prs += len(prs)
+
+                # Mark repo as synced
+                async with AsyncSessionLocal() as session:
+                    await GitHubRepository.update_repo_synced_at(session, repo_id, _utcnow())
+                    await session.commit()
+
+                logger.debug(
+                    "GitHub: synced %s — %d commits, %d PRs",
+                    repo_info.full_name, len(commits), len(prs),
+                )
+            except Exception as exc:
+                logger.warning("GitHub: failed to sync repo %s: %s", repo_info.full_name, exc)
+
+    # Resolve any forward references (links created before Jira ticket existed)
+    async with AsyncSessionLocal() as session:
+        resolved = await GitHubRepository.resolve_forward_jira_links(session)
+        await session.commit()
+    if resolved:
+        logger.info("GitHub: resolved %d forward Jira link(s)", resolved)
+
+    logger.info(
+        "GitHub sync complete: %d repos, %d commits, %d PRs, %d Jira links",
+        len(repos), total_commits, total_prs, total_links,
+    )
 
 
 # ---------------------------------------------------------------------------

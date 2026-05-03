@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     # Comma-separated Jira project/board keys to poll (e.g. "PROJ,INFRA,PLAT")
     jira_project_keys: str = ""
 
+    # GitHub REST API (PAT auth)
+    github_pat: str = ""
+    github_org: str = ""
+    # Comma-separated repo names (empty = all repos under org)
+    github_repos: str = ""
+
     # Update suggestion thresholds
     high_confidence_threshold: float = 0.90
     auto_apply_enabled: bool = False

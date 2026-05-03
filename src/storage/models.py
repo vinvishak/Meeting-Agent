@@ -468,3 +468,138 @@ class AuditEntry(Base):
         foreign_keys=[actor_engineer_id],
         lazy="select",
     )
+
+
+# ---------------------------------------------------------------------------
+# Entity: GitHubRepo
+# ---------------------------------------------------------------------------
+
+
+class GitHubRepo(Base):
+    """A GitHub repository tracked under the configured org."""
+
+    __tablename__ = "github_repos"
+
+    id: Mapped[str] = mapped_column(sa.String(36), primary_key=True, default=_uuid)
+    org: Mapped[str] = mapped_column(sa.String(255), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    full_name: Mapped[str] = mapped_column(sa.String(511), unique=True, nullable=False)
+    default_branch: Mapped[str] = mapped_column(sa.String(100), nullable=False, default="main")
+    is_active: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, default=True)
+    last_synced_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=_now)
+
+    commits: Mapped[list["GitHubCommit"]] = relationship(
+        "GitHubCommit", back_populates="repo", lazy="select"
+    )
+    pull_requests: Mapped[list["GitHubPullRequest"]] = relationship(
+        "GitHubPullRequest", back_populates="repo", lazy="select"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Entity: GitHubCommit
+# ---------------------------------------------------------------------------
+
+
+class GitHubCommit(Base):
+    """A git commit fetched from GitHub. Deduplicated by SHA."""
+
+    __tablename__ = "github_commits"
+
+    id: Mapped[str] = mapped_column(sa.String(36), primary_key=True, default=_uuid)
+    repo_id: Mapped[str] = mapped_column(
+        sa.String(36), sa.ForeignKey("github_repos.id"), nullable=False, index=True
+    )
+    sha: Mapped[str] = mapped_column(sa.String(40), unique=True, nullable=False)
+    message: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    author_login: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    author_name: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    author_email: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    committed_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, index=True)
+    branch: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    url: Mapped[str | None] = mapped_column(sa.String(1024), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=_now)
+
+    repo: Mapped["GitHubRepo"] = relationship("GitHubRepo", back_populates="commits", lazy="select")
+    jira_links: Mapped[list["GitHubJiraLink"]] = relationship(
+        "GitHubJiraLink",
+        back_populates="commit",
+        foreign_keys="GitHubJiraLink.commit_sha",
+        primaryjoin="GitHubCommit.sha == foreign(GitHubJiraLink.commit_sha)",
+        lazy="select",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Entity: GitHubPullRequest
+# ---------------------------------------------------------------------------
+
+
+class GitHubPullRequest(Base):
+    """A GitHub pull request. State is updated on each sync."""
+
+    __tablename__ = "github_pull_requests"
+    __table_args__ = (
+        sa.UniqueConstraint("repo_id", "pr_number", name="uq_github_pr_repo_number"),
+    )
+
+    id: Mapped[str] = mapped_column(sa.String(36), primary_key=True, default=_uuid)
+    repo_id: Mapped[str] = mapped_column(
+        sa.String(36), sa.ForeignKey("github_repos.id"), nullable=False, index=True
+    )
+    pr_number: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    title: Mapped[str] = mapped_column(sa.String(500), nullable=False)
+    body: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    state: Mapped[str] = mapped_column(sa.String(20), nullable=False)  # "open" | "closed" | "merged"
+    author_login: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    head_branch: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    base_branch: Mapped[str | None] = mapped_column(sa.String(255), nullable=True)
+    opened_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, index=True)
+    closed_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    merged_at: Mapped[datetime | None] = mapped_column(sa.DateTime(timezone=True), nullable=True)
+    url: Mapped[str | None] = mapped_column(sa.String(1024), nullable=True)
+    last_synced_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=_now)
+    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=_now)
+
+    repo: Mapped["GitHubRepo"] = relationship("GitHubRepo", back_populates="pull_requests", lazy="select")
+    jira_links: Mapped[list["GitHubJiraLink"]] = relationship(
+        "GitHubJiraLink", back_populates="pr", foreign_keys="GitHubJiraLink.pr_id", lazy="select"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Entity: GitHubJiraLink
+# ---------------------------------------------------------------------------
+
+
+class GitHubJiraLink(Base):
+    """Association between a GitHub artifact (commit or PR) and a Jira ticket key."""
+
+    __tablename__ = "github_jira_links"
+
+    id: Mapped[str] = mapped_column(sa.String(36), primary_key=True, default=_uuid)
+    source_type: Mapped[str] = mapped_column(sa.String(10), nullable=False)  # "commit" | "pr"
+    commit_sha: Mapped[str | None] = mapped_column(sa.String(40), nullable=True, index=True)
+    pr_id: Mapped[str | None] = mapped_column(
+        sa.String(36), sa.ForeignKey("github_pull_requests.id"), nullable=True, index=True
+    )
+    jira_key: Mapped[str] = mapped_column(sa.String(50), nullable=False, index=True)
+    ticket_id: Mapped[str | None] = mapped_column(
+        sa.String(36), sa.ForeignKey("tickets.id"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=_now)
+
+    pr: Mapped[Optional["GitHubPullRequest"]] = relationship(
+        "GitHubPullRequest", back_populates="jira_links", foreign_keys=[pr_id], lazy="select"
+    )
+    commit: Mapped[Optional["GitHubCommit"]] = relationship(
+        "GitHubCommit",
+        back_populates="jira_links",
+        foreign_keys=[commit_sha],
+        primaryjoin="GitHubJiraLink.commit_sha == GitHubCommit.sha",
+        lazy="select",
+    )
+    ticket: Mapped[Optional["Ticket"]] = relationship(
+        "Ticket", foreign_keys=[ticket_id], lazy="select"
+    )
