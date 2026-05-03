@@ -120,6 +120,14 @@ def _register_routes(app: FastAPI) -> None:
         ("src.api.routes.query", "/api/v1", ["query"]),
         ("src.api.routes.audit", "/api/v1", ["audit"]),
         ("src.api.routes.sync", "/api/v1", ["sync"]),
+        ("src.api.routes.org", "/api/v1", ["org"]),
+        ("src.api.routes.goals", "/api/v1", ["goals"]),
+        ("src.api.routes.teams", "/api/v1", ["teams"]),
+        ("src.api.routes.projects", "/api/v1", ["projects"]),
+        ("src.api.routes.meetings", "/api/v1", ["meetings"]),
+        ("src.api.routes.redundancy", "/api/v1", ["redundancy"]),
+        ("src.api.routes.insights", "/api/v1", ["insights"]),
+        ("src.api.routes.github", "/api/v1", ["github"]),
     ]
 
     for module_path, prefix, tags in _route_modules:
