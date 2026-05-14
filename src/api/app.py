@@ -12,6 +12,7 @@ globally. Lifespan handles DB engine startup/shutdown.
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -24,15 +25,17 @@ from src.storage.database import engine
 
 logger = get_logger(__name__)
 
+_scheduler = AsyncIOScheduler()
+
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Startup: verify DB is reachable. Shutdown: dispose engine."""
+    """Startup: verify DB, start background sync scheduler. Shutdown: clean up."""
     settings = get_settings()
     configure_logging(settings.log_level)
     logger.info("Starting meeting-agent API")
 
-    # Verify DB connection on startup
+    # Verify DB connection
     try:
         async with engine.connect() as conn:
             await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
@@ -40,10 +43,24 @@ async def _lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         logger.error("Database connection failed on startup", exc_info=exc)
 
+    # Start background sync — runs every sync_interval_minutes (default 15)
+    from src.workers.sync_worker import run_sync_cycle
+    _scheduler.add_job(
+        run_sync_cycle,
+        "interval",
+        minutes=settings.sync_interval_minutes,
+        id="jira_github_sync",
+        max_instances=1,        # never overlap runs
+        misfire_grace_time=60,  # skip if server was down briefly
+    )
+    _scheduler.start()
+    logger.info("Sync scheduler started — interval: %d min", settings.sync_interval_minutes)
+
     yield
 
+    _scheduler.shutdown(wait=False)
     await engine.dispose()
-    logger.info("Database engine disposed — shutdown complete")
+    logger.info("Shutdown complete")
 
 
 def create_app() -> FastAPI:
@@ -128,6 +145,7 @@ def _register_routes(app: FastAPI) -> None:
         ("src.api.routes.redundancy", "/api/v1", ["redundancy"]),
         ("src.api.routes.insights", "/api/v1", ["insights"]),
         ("src.api.routes.github", "/api/v1", ["github"]),
+        ("src.api.routes.webhooks", "/api/v1", ["webhooks"]),
     ]
 
     for module_path, prefix, tags in _route_modules:
