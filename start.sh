@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -e
 
+mkdir -p data
+
 echo "Running database migrations…"
 uv run alembic upgrade head
 
