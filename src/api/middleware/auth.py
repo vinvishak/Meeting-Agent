@@ -21,7 +21,11 @@ logger = get_logger(__name__)
 
 # Paths that bypass auth (health probes, static frontend, etc.)
 _PUBLIC_PATHS: frozenset[str] = frozenset({"/", "/health", "/docs", "/openapi.json", "/redoc"})
-_PUBLIC_PREFIXES: tuple[str, ...] = ("/app",)
+_PUBLIC_PREFIXES: tuple[str, ...] = (
+    "/app",
+    "/api/v1/webhooks/",  # GitHub uses HMAC, not Bearer
+    "/api/v1/stream",     # EventSource cannot send custom headers
+)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):

@@ -1,6 +1,6 @@
 # Meeting_Agent Development Guidelines
 
-Auto-generated from all feature plans. Last updated: 2026-05-03
+Auto-generated from all feature plans. Last updated: 2026-05-13
 
 ## Active Technologies
 - Python 3.12+ + `argparse` (stdlib), `getpass` (stdlib), `httpx` (transitive dep via fastapi), `anthropic` (existing), `alembic` (existing), `pydantic-settings` (existing) (002-add-quickstart-option)
@@ -15,6 +15,8 @@ Auto-generated from all feature plans. Last updated: 2026-05-03
 - None — all data fetched from backend API on demand (007-prism-dashboard)
 - Python 3.12+ + `httpx` (already present), `re` (stdlib), `pydantic` v2 (existing), `pydantic-settings` (existing), `sqlalchemy` 2.x (existing), `alembic` (existing), `fastapi` (existing), `apscheduler` (existing) (008-github-pat-client)
 - SQLite via existing Alembic migrations — new migration `002_github_schema.py` adds 4 tables (008-github-pat-client)
+- Python 3.12+ (backend) · HTML5/CSS3/JavaScript ES2022 (frontend) + FastAPI + Starlette (existing) · APScheduler (existing) · SQLAlchemy 2.x async (existing) · Alembic (existing) · `hmac`/`hashlib` stdlib · `asyncio` stdlib (009-github-live-stream)
+- SQLite via Alembic migrations — 4 new tables added in `002_github_schema.py` (github_repos, github_commits, github_pull_requests, github_jira_links) (009-github-live-stream)
 
 - Python 3.12+ + `anthropic` (Claude API), `mcp` (MCP Python SDK), `fastapi`, `pydantic` v2, `sqlalchemy` 2.x, `rapidfuzz` (entity matching), `apscheduler` (15-min sync scheduler), `pytest` + `pytest-asyncio` (001-jira-copilot-intelligence)
 
@@ -34,8 +36,8 @@ cd src [ONLY COMMANDS FOR ACTIVE TECHNOLOGIES][ONLY COMMANDS FOR ACTIVE TECHNOLO
 Python 3.12+: Follow standard conventions
 
 ## Recent Changes
+- 009-github-live-stream: Added Python 3.12+ (backend) · HTML5/CSS3/JavaScript ES2022 (frontend) + FastAPI + Starlette (existing) · APScheduler (existing) · SQLAlchemy 2.x async (existing) · Alembic (existing) · `hmac`/`hashlib` stdlib · `asyncio` stdlib
 - 008-github-pat-client: Added Python 3.12+ + `httpx` (already present), `re` (stdlib), `pydantic` v2 (existing), `pydantic-settings` (existing), `sqlalchemy` 2.x (existing), `alembic` (existing), `fastapi` (existing), `apscheduler` (existing)
-- 007-prism-dashboard: Added HTML5, CSS3, vanilla JavaScript (ES2022) + None — Fetch API, CSS custom properties, no external libraries
 - 007-prism-dashboard: Added HTML5, CSS3, vanilla JavaScript (ES2022) + None — Fetch API, CSS custom properties, no external libraries
 
 

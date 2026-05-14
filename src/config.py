@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     github_org: str = ""
     # Comma-separated repo names (empty = all repos under org)
     github_repos: str = ""
+    # GitHub webhook secret (set in GitHub repo settings → Webhooks)
+    github_webhook_secret: str = ""
 
     # Update suggestion thresholds
     high_confidence_threshold: float = 0.90
