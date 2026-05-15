@@ -367,13 +367,15 @@ class TranscriptMention(Base):
 
 
 class UpdateSuggestion(Base):
-    """A proposed Jira change derived from a TranscriptMention."""
+    """A proposed Jira change derived from a TranscriptMention or a GitHub commit."""
 
     __tablename__ = "update_suggestions"
 
     id: Mapped[str] = mapped_column(sa.String(36), primary_key=True, default=_uuid)
-    transcript_mention_id: Mapped[str] = mapped_column(
-        sa.String(36), sa.ForeignKey("transcript_mentions.id"), nullable=False
+    source_type: Mapped[str] = mapped_column(sa.String(20), nullable=False, default="transcript")
+    commit_sha: Mapped[str | None] = mapped_column(sa.String(40), nullable=True, index=True, unique=True)
+    transcript_mention_id: Mapped[str | None] = mapped_column(
+        sa.String(36), sa.ForeignKey("transcript_mentions.id"), nullable=True
     )
     ticket_id: Mapped[str] = mapped_column(
         sa.String(36), sa.ForeignKey("tickets.id"), nullable=False, index=True
@@ -396,7 +398,7 @@ class UpdateSuggestion(Base):
     created_at: Mapped[datetime] = mapped_column(sa.DateTime(timezone=True), nullable=False, default=_now)
 
     # Relationships
-    transcript_mention: Mapped["TranscriptMention"] = relationship(
+    transcript_mention: Mapped[Optional["TranscriptMention"]] = relationship(
         "TranscriptMention", back_populates="update_suggestion", lazy="select"
     )
     ticket: Mapped["Ticket"] = relationship(

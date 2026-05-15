@@ -457,6 +457,35 @@ class SuggestionRepository:
         )
         return await SuggestionRepository.get_by_id(session, suggestion_id)
 
+    @staticmethod
+    async def has_suggestion_for_commit(session: AsyncSession, sha: str) -> bool:
+        result = await session.execute(
+            select(UpdateSuggestion.id).where(UpdateSuggestion.commit_sha == sha).limit(1)
+        )
+        return result.scalar_one_or_none() is not None
+
+    @staticmethod
+    async def create_commit_suggestion(
+        session: AsyncSession,
+        sha: str,
+        ticket_id: str,
+        confidence: float,
+        confidence_tier: str,
+    ) -> UpdateSuggestion:
+        suggestion = UpdateSuggestion(
+            source_type="commit",
+            commit_sha=sha,
+            ticket_id=ticket_id,
+            update_type="comment",
+            proposed_value={"comment": f"Linked via commit {sha[:8]} (semantic match, confidence {confidence:.0%})"},
+            confidence_score=confidence,
+            confidence_tier=confidence_tier,
+            approval_state="pending",
+        )
+        session.add(suggestion)
+        await session.flush()
+        return suggestion
+
 
 # ---------------------------------------------------------------------------
 # AuditEntry
