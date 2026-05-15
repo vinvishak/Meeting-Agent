@@ -17,9 +17,11 @@ import hmac
 import json
 from datetime import UTC, datetime
 
+from anthropic import AsyncAnthropic
 from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
+from src.analysis.commit_matcher import match_and_suggest_commit
 from src.api.broadcaster import broadcast, subscribe, unsubscribe
 from src.config import get_settings
 from src.ingestion.github_client import extract_jira_keys
@@ -90,6 +92,12 @@ async def _ingest_push(payload: dict) -> None:
                     pr_id=None,
                     jira_key=key,
                 )
+
+            # Semantic match — only when no explicit Jira ID found in message
+            if not jira_keys:
+                _settings = get_settings()
+                _client = AsyncAnthropic(api_key=_settings.anthropic_api_key) if _settings.anthropic_api_key else None
+                await match_and_suggest_commit(session, sha=raw["id"], message=raw.get("message", ""), anthropic_client=_client)
 
             broadcasted.append({
                 "type": "new_commit",

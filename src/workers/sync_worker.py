@@ -19,6 +19,9 @@ import asyncio
 import sys
 from datetime import UTC, datetime, timedelta
 
+from anthropic import AsyncAnthropic
+
+from src.analysis.commit_matcher import match_and_suggest_commit
 from src.classification.classifier import classify
 from src.classification.signals import extract_signals
 from src.config import get_settings
@@ -482,6 +485,7 @@ async def _sync_github() -> None:
                 # Fetch and store commits
                 commits = await gh.list_commits(repo_info.full_name, since=since)
                 async with AsyncSessionLocal() as session:
+                    _anthropic_client = AsyncAnthropic(api_key=settings.anthropic_api_key) if settings.anthropic_api_key else None
                     for c in commits:
                         commit = await GitHubRepository.upsert_commit(
                             session,
@@ -495,7 +499,8 @@ async def _sync_github() -> None:
                             branch=c.branch,
                             url=c.url,
                         )
-                        for key in extract_jira_keys(c.message):
+                        jira_keys = list(extract_jira_keys(c.message))
+                        for key in jira_keys:
                             await GitHubRepository.upsert_jira_link(
                                 session,
                                 source_type="commit",
@@ -503,6 +508,8 @@ async def _sync_github() -> None:
                                 commit_sha=commit.sha,
                             )
                             total_links += 1
+                        if not jira_keys:
+                            await match_and_suggest_commit(session, sha=c.sha, message=c.message, anthropic_client=_anthropic_client)
                     await session.commit()
                 total_commits += len(commits)
 

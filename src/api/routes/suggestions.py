@@ -40,6 +40,8 @@ class TranscriptSource(BaseModel):
 
 class SuggestionOut(BaseModel):
     id: str
+    source_type: str = "transcript"
+    commit_sha: str | None = None
     ticket: TicketRef | None = None
     update_type: str
     proposed_value: dict
@@ -149,6 +151,8 @@ async def list_suggestions(
         out.append(
             SuggestionOut(
                 id=s.id,
+                source_type=s.source_type,
+                commit_sha=s.commit_sha,
                 ticket=ticket_ref,
                 update_type=s.update_type,
                 proposed_value=s.proposed_value,
